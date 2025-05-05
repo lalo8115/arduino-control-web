@@ -59,11 +59,51 @@
       </div>
     </section>
   </div>
-
 <script>
   const apiUrl = "https://0zqdqmtz1b.execute-api.us-east-2.amazonaws.com/default/ControlArduino";
   let isSending = false;
 
+  // ——————————————————————————
+  // Función: mostrar feedback al usuario
+  function mostrarEstado(mensaje, esError = false, detalles = "") {
+    const estado = document.getElementById('estado');
+    const contenido = document.getElementById('estado-contenido');
+    const detallesEl = document.getElementById('estado-detalles');
+
+    contenido.textContent = mensaje;
+    estado.className = esError
+      ? 'text-center p-3 rounded-lg bg-red-900/50 text-red-300'
+      : 'text-center p-3 rounded-lg bg-green-900/50 text-green-300';
+
+    if (detalles) {
+      detallesEl.textContent = detalles;
+      detallesEl.classList.remove('hidden');
+    } else {
+      detallesEl.classList.add('hidden');
+    }
+
+    estado.classList.remove('hidden');
+    setTimeout(() => estado.classList.add('hidden'), 4000);
+  }
+
+  // ——————————————————————————
+  // Función: mostrar/ocultar loading y deshabilitar botones
+  function toggleLoading(mostrar) {
+    const loading = document.getElementById('loading');
+    const botones = document.querySelectorAll('button');
+
+    isSending = mostrar;
+    if (mostrar) {
+      loading.classList.remove('hidden');
+      botones.forEach(b => b.disabled = true);
+    } else {
+      loading.classList.add('hidden');
+      botones.forEach(b => b.disabled = false);
+    }
+  }
+
+  // ——————————————————————————
+  // Función: enviar comando rápido
   async function enviarComando(accion) {
     if (isSending) return;
     toggleLoading(true);
@@ -71,7 +111,7 @@
       const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: accion })
+        body: JSON.stringify({ accion })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -83,6 +123,8 @@
     }
   }
 
+  // ——————————————————————————
+  // Función: enviar texto personalizado
   async function enviarTexto() {
     if (isSending) return;
     const texto = document.getElementById('mensaje').value.trim();
