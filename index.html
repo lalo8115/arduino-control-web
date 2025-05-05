@@ -2,65 +2,172 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Control de Arduino</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
   <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6 space-y-6">
-    <h1 class="text-2xl font-bold text-center">Panel de Control Arduino</h1>
+    <header class="text-center">
+      <h1 class="text-2xl font-bold">Panel de Control Arduino</h1>
+      <p class="text-sm text-gray-400 mt-1">Control remoto vía API Gateway</p>
+    </header>
 
-    <!-- Botones de encendido -->
-    <div class="flex justify-around">
-      <button onclick="enviarComando('encender')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow">
-        Encender
+    <!-- Sección de comandos básicos -->
+    <section class="space-y-4">
+      <h2 class="font-semibold text-lg border-b border-gray-700 pb-2">Comandos Rápidos</h2>
+      <div class="flex justify-around gap-4">
+        <button onclick="enviarComando('encender')" 
+                class="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-all">
+          <i class="fas fa-power-off"></i>
+          Encender
+        </button>
+        <button onclick="enviarComando('apagar')" 
+                class="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-all">
+          <i class="fas fa-stop"></i>
+          Apagar
+        </button>
+      </div>
+    </section>
+
+    <!-- Sección de mensaje personalizado -->
+    <section class="space-y-4">
+      <h2 class="font-semibold text-lg border-b border-gray-700 pb-2">Mensaje Personalizado</h2>
+      <div>
+        <label class="block mb-2 text-sm font-medium">Texto a mostrar:</label>
+        <input type="text" id="mensaje" 
+               class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+               placeholder="Escribe tu mensaje aquí">
+      </div>
+      <button onclick="enviarTexto()" 
+              class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-all">
+        <i class="fas fa-paper-plane"></i>
+        Enviar Mensaje
       </button>
-      <button onclick="enviarComando('apagar')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow">
-        Apagar
-      </button>
-    </div>
+    </section>
 
-    <!-- Caja de texto -->
-    <div>
-      <label class="block mb-2 text-sm font-medium">Texto a mostrar en pantalla:</label>
-      <input type="text" id="mensaje" class="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Escribe tu mensaje aquí" />
-    </div>
-
-    <!-- Botón de envío -->
-    <button onclick="enviarTexto()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow">
-      Enviar mensaje
-    </button>
-
-    <!-- Mensaje de estado -->
-    <div id="estado" class="text-sm text-center text-green-400"></div>
+    <!-- Estado y feedback -->
+    <section>
+      <div id="estado" class="text-center p-3 rounded-lg bg-gray-700 hidden">
+        <div id="estado-contenido"></div>
+        <div id="estado-detalles" class="text-xs text-gray-400 mt-1 hidden"></div>
+      </div>
+      <div id="loading" class="flex items-center justify-center gap-2 text-blue-400 hidden">
+        <i class="fas fa-circle-notch fa-spin"></i>
+        <span>Enviando comando...</span>
+      </div>
+    </section>
   </div>
 
   <script>
     const apiUrl = "https://62do887ka2.execute-api.us-east-2.amazonaws.com/prod";
+    let isSending = false;
 
-    async function enviarComando(accion) {
-      const res = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comando: accion })
-      });
-
-      const data = await res.json();
-      document.getElementById("estado").innerText = "Comando: " + accion + " enviado.";
+    // Mostrar estado
+    function mostrarEstado(mensaje, esError = false, detalles = "") {
+      const estado = document.getElementById('estado');
+      const contenido = document.getElementById('estado-contenido');
+      const detallesElement = document.getElementById('estado-detalles');
+      
+      contenido.innerHTML = mensaje;
+      estado.className = esError ? 
+        'text-center p-3 rounded-lg bg-red-900/50 text-red-300' : 
+        'text-center p-3 rounded-lg bg-green-900/50 text-green-300';
+      
+      if (detalles) {
+        detallesElement.textContent = detalles;
+        detallesElement.classList.remove('hidden');
+      } else {
+        detallesElement.classList.add('hidden');
+      }
+      
+      estado.classList.remove('hidden');
+      setTimeout(() => estado.classList.add('hidden'), 5000);
     }
 
+    // Manejar loading
+    function toggleLoading(mostrar) {
+      const loading = document.getElementById('loading');
+      const botones = document.querySelectorAll('button');
+      
+      isSending = mostrar;
+      if (mostrar) {
+        loading.classList.remove('hidden');
+        botones.forEach(btn => btn.disabled = true);
+      } else {
+        loading.classList.add('hidden');
+        botones.forEach(btn => btn.disabled = false);
+      }
+    }
+
+    // Función para enviar comandos
+    async function enviarComando(accion) {
+      if (isSending) return;
+      
+      toggleLoading(true);
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Origin": "https://lalo8115.github.io"
+          },
+          body: JSON.stringify({ comando: accion })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Error HTTP: ${res.status} - ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        mostrarEstado(`Comando "${accion}" enviado correctamente`, false, 
+                     `Respuesta: ${JSON.stringify(data)}`);
+      } catch (error) {
+        console.error("Error:", error);
+        mostrarEstado(`Error al enviar "${accion}"`, true, 
+                     error.message);
+      } finally {
+        toggleLoading(false);
+      }
+    }
+
+    // Función para enviar texto
     async function enviarTexto() {
-      const texto = document.getElementById("mensaje").value;
-      if (!texto) return alert("Por favor ingresa un mensaje");
+      if (isSending) return;
+      
+      const texto = document.getElementById('mensaje').value.trim();
+      if (!texto) {
+        mostrarEstado("Por favor ingresa un mensaje válido", true);
+        return;
+      }
 
-      const res = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comando: texto })
-      });
+      toggleLoading(true);
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Origin": "https://lalo8115.github.io"
+          },
+          body: JSON.stringify({ comando: texto })
+        });
 
-      const data = await res.json();
-      document.getElementById("estado").innerText = "Mensaje enviado a pantalla: " + texto;
-      document.getElementById("mensaje").value = "";
+        if (!res.ok) {
+          throw new Error(`Error HTTP: ${res.status} - ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        mostrarEstado(`Mensaje enviado: "${texto}"`, false, 
+                     `Respuesta: ${JSON.stringify(data)}`);
+        document.getElementById('mensaje').value = "";
+      } catch (error) {
+        console.error("Error:", error);
+        mostrarEstado("Error al enviar mensaje", true, 
+                     error.message);
+      } finally {
+        toggleLoading(false);
+      }
     }
   </script>
 </body>
